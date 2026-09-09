@@ -1,0 +1,25 @@
+name: experience_ghana
+description: Explore Ghana. Deeply.
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  dio: ^5.7.0
+  flutter_riverpod: ^2.6.1
+  go_router: ^14.6.1
+  hive_flutter: ^1.1.0
+  just_audio: ^0.9.42
+  mapbox_maps_flutter: ^2.6.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
