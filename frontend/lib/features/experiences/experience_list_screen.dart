@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'experience.dart';
 import 'experience_provider.dart';
+import 'search_history_store.dart';
 
 class ExperienceListScreen extends ConsumerStatefulWidget {
   const ExperienceListScreen({super.key});
@@ -250,6 +251,11 @@ String _categoryLabel(String category) {
 }
 
 class ExperienceSearch extends SearchDelegate<void> {
+  ExperienceSearch() : _historyStore = SearchHistoryStore();
+
+  final SearchHistoryStore _historyStore;
+  String? _selectedCategory;
+
   @override
   List<Widget>? buildActions(BuildContext context) => [
         IconButton(onPressed: () => query = '', icon: const Icon(Icons.clear)),
@@ -262,16 +268,64 @@ class ExperienceSearch extends SearchDelegate<void> {
       );
 
   @override
-  Widget buildResults(BuildContext context) => _SearchResults(query: query);
+  void showResults(BuildContext context) {
+    _saveQuery();
+    super.showResults(context);
+  }
+
+  void _saveQuery() {
+    if (query.trim().isNotEmpty) _historyStore.add(query);
+  }
 
   @override
-  Widget buildSuggestions(BuildContext context) => _SearchResults(query: query, showTrending: query.isEmpty);
+  Widget buildResults(BuildContext context) => _SearchResults(
+        query: query,
+        category: _selectedCategory,
+        showTrending: false,
+        historyStore: _historyStore,
+        onRecentSearch: (value) {
+          query = value;
+          showResults(context);
+        },
+        onCategoryChanged: (value) {
+          _selectedCategory = value;
+          showSuggestions(context);
+        },
+      );
+
+  @override
+  Widget buildSuggestions(BuildContext context) => _SearchResults(
+        query: query,
+        category: _selectedCategory,
+        showTrending: query.trim().isEmpty,
+        historyStore: _historyStore,
+        onRecentSearch: (value) {
+          query = value;
+          showResults(context);
+        },
+        onCategoryChanged: (value) {
+          _selectedCategory = value;
+          showSuggestions(context);
+        },
+      );
+
 }
 
 class _SearchResults extends ConsumerWidget {
-  const _SearchResults({required this.query, this.showTrending = false});
+  const _SearchResults({
+    required this.query,
+    required this.historyStore,
+    required this.onCategoryChanged,
+    required this.onRecentSearch,
+    this.category,
+    this.showTrending = false,
+  });
   final String query;
+  final String? category;
   final bool showTrending;
+  final SearchHistoryStore historyStore;
+  final ValueChanged<String?> onCategoryChanged;
+  final ValueChanged<String> onRecentSearch;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -282,24 +336,117 @@ class _SearchResults extends ConsumerWidget {
       data: (items) {
         final normalizedQuery = query.trim().toLowerCase();
         final matches = items.where((item) {
-          return normalizedQuery.isEmpty ||
+          final matchesCategory = category == null || item.category == category;
+          return matchesCategory &&
+              (normalizedQuery.isEmpty ||
               item.title.toLowerCase().contains(normalizedQuery) ||
               item.category.contains(normalizedQuery) ||
-              item.region.toLowerCase().contains(normalizedQuery);
+              item.region.toLowerCase().contains(normalizedQuery) ||
+              item.address.toLowerCase().contains(normalizedQuery));
         }).toList();
-        return ListView(
-          padding: const EdgeInsets.all(20),
+        final visible = showTrending
+            ? (matches.where((item) => item.tier == 'signature' || item.tier == 'featured').take(3).toList())
+            : matches;
+        return Column(
           children: [
-            Text(showTrending ? 'Trending now' : 'Results', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            ...matches.map((item) => ListTile(
-                  title: Text(item.title),
-                  subtitle: Text('${_categoryLabel(item.category)} · ${item.region}'),
-                  onTap: () => context.go('/experiences/${item.slug}'),
-                )),
+            _SearchCategoryFilters(
+              category: category,
+              onSelected: onCategoryChanged,
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                children: [
+                  if (showTrending) ...[
+                    Text('Trending now', style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                  ] else if (normalizedQuery.isNotEmpty) ...[
+                    Text('${visible.length} result${visible.length == 1 ? '' : 's'}', style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                  ],
+                  if (visible.isEmpty)
+                    Text(showTrending ? 'No trending experiences yet.' : 'No experiences match your search.')
+                  else
+                    ...visible.map((item) => ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(item.title),
+                          subtitle: Text('${_categoryLabel(item.category)} · ${item.region}'),
+                          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                          onTap: () => context.go('/experiences/${item.slug}'),
+                        )),
+                  if (showTrending)
+                    FutureBuilder<List<String>>(
+                      future: historyStore.read(),
+                      builder: (_, snapshot) {
+                        final searches = snapshot.data ?? const <String>[];
+                        if (searches.isEmpty) return const SizedBox.shrink();
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 20),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('Recent searches', style: Theme.of(context).textTheme.titleMedium),
+                                TextButton(
+                                  onPressed: () async {
+                                    await historyStore.clear();
+                                    (context as Element).markNeedsBuild();
+                                  },
+                                  child: const Text('Clear'),
+                                ),
+                              ],
+                            ),
+                            ...searches.map((search) => ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: const Icon(Icons.history),
+                                  title: Text(search),
+                                  onTap: () => onRecentSearch(search),
+                                )),
+                          ],
+                        );
+                      },
+                    ),
+                ],
+              ),
+            ),
           ],
         );
       },
     );
   }
+}
+
+class _SearchCategoryFilters extends StatelessWidget {
+  const _SearchCategoryFilters({required this.category, required this.onSelected});
+
+  static const _categories = <({String label, String? value})>[
+    (label: 'All', value: null),
+    (label: 'History', value: 'history'),
+    (label: 'Nature', value: 'nature'),
+    (label: 'Culture', value: 'culture'),
+    (label: 'Rest', value: 'rest'),
+  ];
+
+  final String? category;
+  final ValueChanged<String?> onSelected;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        height: 56,
+        child: ListView.separated(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          scrollDirection: Axis.horizontal,
+          itemCount: _categories.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemBuilder: (_, index) {
+            final item = _categories[index];
+            return ChoiceChip(
+              label: Text(item.label),
+              selected: category == item.value,
+              onSelected: (_) => onSelected(item.value),
+            );
+          },
+        ),
+      );
 }
