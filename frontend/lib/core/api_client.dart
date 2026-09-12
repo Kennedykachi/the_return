@@ -11,3 +11,10 @@ final apiClient = Dio(BaseOptions(
   connectTimeout: const Duration(seconds: 10),
   receiveTimeout: const Duration(seconds: 15),
 ));
+
+Future<Response<List<dynamic>>> fetchExperiences({String? category}) {
+  return apiClient.get<List<dynamic>>(
+    'experiences/',
+    queryParameters: category == null ? null : {'category': category},
+  );
+}

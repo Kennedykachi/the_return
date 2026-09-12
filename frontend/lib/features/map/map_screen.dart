@@ -21,7 +21,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           Positioned.fill(
             child: isMapView
                 ? const _ExperienceMap()
-                : ref.watch(experiencesProvider).when(
+                : ref.watch(experiencesProvider(null)).when(
                   loading: () => const Center(child: CircularProgressIndicator()),
                   error: (_, __) => const Center(child: Text('Could not load places.')),
                   data: (items) => ListView(children: items.map((item) => ListTile(title: Text(item.title), subtitle: Text(item.region))).toList()),
@@ -63,7 +63,7 @@ class _ExperienceMapState extends ConsumerState<_ExperienceMap> {
   static const _token = String.fromEnvironment('ACCESS_TOKEN');
 
   Future<void> _onMapCreated(MapboxMap mapboxMap) async {
-    final experiences = await ref.read(experiencesProvider.future);
+    final experiences = await ref.read(experiencesProvider(null).future);
     final manager = await mapboxMap.annotations.createCircleAnnotationManager();
     for (final experience in experiences) {
       await manager.create(CircleAnnotationOptions(
