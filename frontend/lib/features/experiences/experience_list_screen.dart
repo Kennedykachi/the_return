@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'experience.dart';
 import 'experience_provider.dart';
 
 class ExperienceListScreen extends ConsumerStatefulWidget {
@@ -21,6 +22,14 @@ class _ExperienceListScreenState extends ConsumerState<ExperienceListScreen> {
   ];
 
   String? _selectedCategory;
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -33,6 +42,33 @@ class _ExperienceListScreenState extends ConsumerState<ExperienceListScreen> {
         ),
         body: Column(
           children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _searchQuery = value.trim().toLowerCase()),
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  hintText: 'Search places, regions, or categories',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchQuery.isEmpty
+                      ? null
+                      : IconButton(
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                          icon: const Icon(Icons.clear),
+                        ),
+                  filled: true,
+                  fillColor: Theme.of(context).colorScheme.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
             _CategoryTabs(
               categories: _categories,
               selectedCategory: _selectedCategory,
@@ -48,24 +84,75 @@ class _ExperienceListScreenState extends ConsumerState<ExperienceListScreen> {
                   ),
                 ),
                 data: (experiences) {
-                  if (experiences.isEmpty) {
-                    return const Center(child: Text('No experiences found in this category yet.'));
+                  final filtered = experiences.where(_matchesSearch).toList();
+                  if (filtered.isEmpty) {
+                    return Center(
+                      child: Text(
+                        experiences.isEmpty
+                            ? 'No experiences found in this category yet.'
+                            : 'No experiences match your search.',
+                      ),
+                    );
                   }
                   return ListView.separated(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    itemCount: experiences.length,
+                    itemCount: filtered.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemBuilder: (_, index) {
-                      final experience = experiences[index];
+                      final experience = filtered[index];
                       return Card(
                         clipBehavior: Clip.antiAlias,
                         child: InkWell(
                           onTap: () => context.go('/experiences/${experience.slug}'),
-                          child: ListTile(
-                            leading: Image.network(experience.imageUrl, width: 64, height: 64, fit: BoxFit.cover),
-                            title: Text(experience.title),
-                            subtitle: Text('${experience.region} · ${experience.timeCommitment}'),
-                            trailing: Text(_categoryLabel(experience.category)),
+                          child: Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: Row(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.network(
+                                    experience.imageUrl,
+                                    width: 92,
+                                    height: 92,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const ColoredBox(
+                                      color: Colors.black12,
+                                      child: SizedBox(width: 92, height: 92, child: Icon(Icons.image_not_supported_outlined)),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              experience.title,
+                                              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                                            ),
+                                          ),
+                                          _TierBadge(tier: experience.tier),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text('${_categoryLabel(experience.category)} · ${experience.region}'),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        experience.address,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: Theme.of(context).textTheme.bodySmall,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text('${experience.timeCommitment} · ${experience.physicalLevel}'),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       );
@@ -82,6 +169,48 @@ class _ExperienceListScreenState extends ConsumerState<ExperienceListScreen> {
           label: const Text('My trip'),
         ),
       );
+
+  bool _matchesSearch(Experience experience) {
+    return _searchQuery.isEmpty ||
+        experience.title.toLowerCase().contains(_searchQuery) ||
+        experience.category.toLowerCase().contains(_searchQuery) ||
+        experience.region.toLowerCase().contains(_searchQuery) ||
+        experience.address.toLowerCase().contains(_searchQuery);
+  }
+}
+
+class _TierBadge extends StatelessWidget {
+  const _TierBadge({required this.tier});
+
+  final String tier;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.secondaryContainer,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Text(
+            _tierLabel(tier),
+            style: Theme.of(context).textTheme.labelSmall,
+          ),
+        ),
+      );
+}
+
+String _tierLabel(String tier) {
+  switch (tier) {
+    case 'hidden_gem':
+      return 'Hidden gem';
+    case 'signature':
+      return 'Signature';
+    case 'featured':
+      return 'Featured';
+    default:
+      return tier;
+  }
 }
 
 class _CategoryTabs extends StatelessWidget {
