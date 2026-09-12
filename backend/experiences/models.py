@@ -8,10 +8,17 @@ class Experience(models.Model):
         CULTURE = 'culture', 'Culture'
         REST = 'rest', 'Rest'
 
+    class Tier(models.TextChoices):
+        SIGNATURE = 'signature', 'Signature'
+        FEATURED = 'featured', 'Featured'
+        HIDDEN_GEM = 'hidden_gem', 'Hidden Gem'
+
     title = models.CharField(max_length=160)
     slug = models.SlugField(unique=True)
     category = models.CharField(max_length=20, choices=Category.choices)
+    tier = models.CharField(max_length=20, choices=Tier.choices)
     region = models.CharField(max_length=80)
+    address = models.CharField(max_length=255)
     image_url = models.URLField()
     audio_url = models.URLField(blank=True)
     location = models.PointField(geography=True, srid=4326)
@@ -24,6 +31,8 @@ class Experience(models.Model):
     what_to_bring = models.TextField()
     getting_there = models.TextField()
     bullet_points = models.JSONField(default=list)
+    is_bookable = models.BooleanField(default=False)
+    booking_url = models.URLField(blank=True)
     is_published = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
