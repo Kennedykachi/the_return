@@ -1,9 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 
-/// Android emulators reach the host at 10.0.2.2. Override this for devices.
+/// Web uses localhost; Android emulators reach the host at 10.0.2.2.
 const apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'http://10.0.2.2:8000/api/',
+  defaultValue: kIsWeb ? 'http://localhost:8000/api/' : 'http://10.0.2.2:8000/api/',
 );
 
 final apiClient = Dio(BaseOptions(
