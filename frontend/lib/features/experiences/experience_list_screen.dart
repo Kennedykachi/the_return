@@ -113,6 +113,7 @@ class _CategoryTabs extends StatelessWidget {
           },
         ),
       );
+}
 
 String _categoryLabel(String category) {
   if (category.isEmpty) return category;

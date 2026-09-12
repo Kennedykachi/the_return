@@ -69,8 +69,8 @@ class _ExperienceMapState extends ConsumerState<_ExperienceMap> {
       await manager.create(CircleAnnotationOptions(
         geometry: Point(coordinates: Position(experience.longitude, experience.latitude)),
         circleRadius: 9,
-        circleColor: '#C04A35',
-        circleStrokeColor: '#1A2A44',
+        circleColor: 0xFFC04A35,
+        circleStrokeColor: 0xFF1A2A44,
         circleStrokeWidth: 2,
       ));
     }
